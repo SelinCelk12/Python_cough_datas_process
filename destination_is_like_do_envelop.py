@@ -216,3 +216,7 @@ print(f"Zarf Eşiği: {threshold_envelope:.2f}")
 print(f"Morfolojik Erozyon Kernel Boyutu: {kernel_size_erosion}")
 print(f"Morfolojik Dilasyon Kernel Boyutu: {kernel_size_dilation}")
 print(f"Buton verisi oluşturuldu. 1'lerin oranı: {np.sum(final_button_data) / len(final_button_data):.2f}")
+
+
+
+# YÜZDE 3.68 HATALI
