@@ -159,6 +159,7 @@ def plot_filter_frequency_response(b, a, fs):
     ax1.axhline(-3, color='g', linestyle='--', label='-3 dB Noktası')
     ax1.tick_params(axis='y', colors='b')
     ax1.set_ylim(-60, 5)
+    ax1.set_xlim(0, 20)
     ax1.legend()
     
     # ax2 = ax1.twinx()
@@ -365,3 +366,4 @@ print(f"Morfolojik Erozyon Kernel Boyutu: {kernel_size_erosion}")
 print(f"Morfolojik Dilasyon Kernel Boyutu: {kernel_size_dilation}")
 
 print(f"Buton verisi oluşturuldu. 1'lerin oranı: {np.sum(final_button_data) / len(final_button_data):.2f}")
+
