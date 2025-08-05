@@ -87,7 +87,7 @@ try:
     df = pd.read_csv(file_path, header=None)
     # Burada hangi sensörün verisini kullanacağınızı belirleyin
     # Örneğin, pulmoner sensör için 0. sütunu seçelim
-    original_signal = df.iloc[:, 0].astype(float)
+    original_signal = df.iloc[:, 2].astype(float)
 
     # Filtreleme parametreleri
     fs = 4800  # Örnekleme frekansı
@@ -363,4 +363,5 @@ print(f"Hareketli Ortalama Pencere Boyutu: {window_size} örnek")
 print(f"Zarf Eşiği: {threshold_envelope:.2f}")
 print(f"Morfolojik Erozyon Kernel Boyutu: {kernel_size_erosion}")
 print(f"Morfolojik Dilasyon Kernel Boyutu: {kernel_size_dilation}")
+
 print(f"Buton verisi oluşturuldu. 1'lerin oranı: {np.sum(final_button_data) / len(final_button_data):.2f}")
