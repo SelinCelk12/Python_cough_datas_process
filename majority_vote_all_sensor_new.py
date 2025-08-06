@@ -48,18 +48,25 @@ def process_signal(signal):
     dilated = binary_dilation(eroded, structure=np.ones(800)).astype(int)
     return dilated
 
-def detect_events(binary_signal):
+def detect_events(binary_signal, min_duration=100):
     events = []
     start = None
     for i, val in enumerate(binary_signal):
         if val == 1 and start is None:
             start = i
         elif val == 0 and start is not None:
-            events.append((start, i))
+            end = i
+            # Olayın süresini kontrol et
+            if (end - start) >= min_duration:
+                events.append((start, end))
             start = None
     if start is not None:
-        events.append((start, len(binary_signal)))
+        end = len(binary_signal)
+        if (end - start) >= min_duration:
+            events.append((start, end))
     return events
+# ... (detect_events fonksiyonu buraya kadar)
+
 
 # Adaptif eşik kontrolü
 def is_active(signal, threshold_key):
@@ -115,7 +122,7 @@ def calculate_confusion(true_events, pred_events, tolerance):
 
 # Ana döngü
 cumulative_TP = cumulative_FN = cumulative_FP = 0
-window_size =700
+window_size = 700
 step = 600
 
 for idx in range(1, FILE_COUNT + 1):
