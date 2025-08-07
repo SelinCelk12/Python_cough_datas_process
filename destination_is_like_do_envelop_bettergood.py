@@ -8,7 +8,7 @@ from scipy.signal import hilbert
 
 
 # Gerçek verinizi yüklemek için bu kısmı kullanın
-file_path = r"C:\Users\selin\Downloads\20250602_001_standup_overClothes.csv"
+file_path = r"C:\Users\selin\OneDrive\Masaüstü\data_for _cough\20.csv"
 
 try:
     # CSV dosyasını okuyun. Eğer dosyanızın başlık satırı yoksa 'header=None' kullanın.
@@ -17,8 +17,73 @@ try:
     pulmonary_signal = pulmonary_df.iloc[:, 0].values # İlk sütunu al
 
     print(f"Başarıyla veri yüklendi: {file_path}")
-    analytic_signal = hilbert(pulmonary_signal)
-    envelope_signal = np.abs(analytic_signal) # Zarf, analitik sinyalin mutlak değeri
+
+    # Sinyalin karakteristiğini değerlendirme
+    # Örnek: Sinyalin standart sapması belirli bir eşiğin altında ve
+    # belirli bir pencerede (örneğin 10000 örnek) 
+    # eşik üzeri pik sayısı az ise filtreleme yap
+
+    # Bu eşikler ve pencere boyutları veri setinize göre ayarlanmalıdır!
+    std_threshold = 100 # Sinyalin standart sapması için bir eşik
+    peak_count_threshold = 5 # Belirli bir pencerede izin verilen maksimum pik sayısı
+    evaluation_window = 10000 # Sinyali değerlendirmek için pencere boyutu
+
+    #Sinyali parçalara bölerek değerlendirme (veya tüm sinyali değerlendirme)
+    # Basitlik için tüm sinyali değerlendirelim:
+
+    current_std = np.std(pulmonary_signal)
+
+    # Geçici bir eşik kullanarak pikleri sayın (bu, öksürük eşiğinden farklı olabilir)
+    temp_envelope = np.abs(hilbert(pulmonary_signal))
+    temp_threshold = np.mean(temp_envelope) + np.std(temp_envelope) * 3.0 # Daha düşük bir eşik
+    temp_button_data = (temp_envelope > temp_threshold).astype(int)
+
+    # Basit bir pik sayacı (1'den 0'a geçişleri sayarak)
+    peak_counts = np.sum(np.diff(temp_button_data) == -1) 
+
+    pulmonary_signal_to_process = pulmonary_signal
+
+    current_signal_std = np.std(pulmonary_signal)
+
+    # Geçici zarf ve pik sayımı için
+    temp_analytic_signal = hilbert(pulmonary_signal)
+    temp_envelope = np.abs(temp_analytic_signal)
+    temp_peak_detection_threshold = np.mean(temp_envelope) + np.std(temp_envelope) * 3.0 # Bu çarpanı da ayarlayabilirsiniz
+    temp_peak_binary = (temp_envelope > temp_peak_detection_threshold).astype(int)
+    temp_eroded_peaks = binary_erosion(temp_peak_binary, structure=np.ones(50)).astype(int) # Küçük bir kernel
+    num_detected_peaks = np.sum(np.diff(temp_eroded_peaks) == 1)
+
+    should_filter = (current_signal_std < std_threshold) and \
+                (num_detected_peaks < peak_count_threshold)
+
+    # DEBUG: Koşul değerlerini yazdır (BU ÇIKTILARI KONTROL EDİN!)
+    print(f"\nDEBUG Koşullu Filtreleme Kontrolü:")
+    print(f"  current_signal_std: {current_signal_std:.2f} (Eşik: {std_threshold})")
+    print(f"  num_detected_peaks: {num_detected_peaks} (Eşik: {peak_count_threshold})")
+    print(f"  should_filter: {should_filter}")
+
+    pulmonary_signal_processed = pulmonary_signal # Varsayılan olarak orijinal sinyal
+
+    if should_filter:
+        print("Koşullar karşılandı: Sinyal filtreleniyor.")
+        # Butterworth filtreleme kodu buraya gelecek
+        Fs = 4800 # Örnekleme frekansı (Gerçek değerinizle değiştirin!)
+        nyquist = 0.5 * Fs
+        lowcut = 20  # Hz
+        highcut = 200 # Hz
+        low = lowcut / nyquist
+        high = highcut / nyquist
+        order = 4 
+        b, a = butter(order, [low, high], btype='band')
+        pulmonary_signal_to_process = filtfilt(b, a, pulmonary_signal)
+    else:
+        print("Koşullar karşılanmadı: Sinyal filtrelenmiyor.")
+
+    # Zarf hesaplaması artık filtrelenmiş veya orijinal sinyal üzerinden yapılacak
+    analytic_signal = hilbert(pulmonary_signal_to_process) 
+    envelope_signal = np.abs(analytic_signal) 
+    # Filtrelenmiş sinyal üzerinde zarf hesaplama
+  
 
 # ... (Histerezis ve Morfolojik işlemler buradan sonra devam edecek) ...
     
@@ -60,7 +125,7 @@ try:
     # Sütun adlarını Colab çıktınıza göre belirttik
     column_names = ['Sensor1', 'Sensor2', 'Sensor3', 'Sensor4']
     df = pd.DataFrame(processed_data, columns=column_names)
-
+  
 
     print("--- DataFrame'in İlk 5 Satırı (MANUEL AYRIŞTIRMA İLE KESİN ÇÖZÜM) ---")
     print(df.head()) # <<< BU ÇIKTIYI GÖRMEK İSTİYORUZ!
@@ -109,19 +174,32 @@ print(stretch_sensor_raw)
 pulmonary_signal_centered = pulmonary_signal - np.mean(pulmonary_signal)
 squared_signal = pulmonary_signal_centered**2
 
+
 window_size = 1500
 kernel = np.ones(window_size) / window_size
 envelope_signal_raw = convolve(squared_signal, kernel, mode='same')
 envelope_signal = np.sqrt(envelope_signal_raw)
 
-threshold_envelope = np.mean(envelope_signal) + np.std(envelope_signal) * 0.5
+
+# Mevcut kodunuzda bu satırdan sonra:
+threshold_envelope = np.mean(envelope_signal) + np.std(envelope_signal) * 3.0
 button_data_2 = (envelope_signal > threshold_envelope).astype(int)
 
+# Bu 3-4 satırı ekleyin:
+# Minimum aktivite kontrolü - izole spike'ları filtrele
+min_activity_window = 300  # 200 örneklik pencerede
+min_activity_threshold = 100  # en az 50 örnek aktif olmalı
 
-kernel_size_erosion = 240
-kernel_size_dilation =2400
+activity_check = np.convolve(button_data_2.astype(float), 
+                           np.ones(min_activity_window), mode='same')
+button_data_2 = (button_data_2 & (activity_check >= min_activity_threshold)).astype(int)
+
+# Sonra mevcut morfolojik işlemler devam eder:
+kernel_size_erosion = 1500
+kernel_size_dilation = 2400
 eroded_button_data = binary_erosion(button_data_2, structure=np.ones(kernel_size_erosion)).astype(int)
 final_button_data = binary_dilation(eroded_button_data, structure=np.ones(kernel_size_dilation)).astype(int)
+
 
 # ... (envelope_signal hesaplandıktan sonra) ...
 
@@ -161,9 +239,7 @@ for i in range(len(button_data)):
 
 
 
-# --- Görselleştirmeler (önceki kodlara benzer) ---
 x_limit = 100000
-# Her grafik için ayrı dikey eksen (y ekseni) sınırları
 y_limit_pulmonary = (0, 4000) # Pulmonary ve Ambient için
 y_limit_stretch_sensor = (0, 4000)
 y_limit_button = (-0.1, 1.1) # Buton 0-1 arasında olduğu için biraz boşluk bırakalım
